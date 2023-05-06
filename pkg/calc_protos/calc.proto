@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+option go_package = "github.com/mhbvr/grpc-example/pkg/calc_protos";
+
+package calc_protos;
+
+// The calculator
+service Calc {
+  // Calculate the expression value
+  rpc Compute (ComputeRequest) returns (ComputeReply) {}
+}
+
+// Variable value for computation
+message Variable {
+  string name = 1;
+  double value = 2;
+}
+
+// The request message containing the user's name.
+message ComputeRequest {
+  string expression = 1;
+  repeated Variable vars = 2;
+}
+
+// The response message containing the greetings
+message ComputeReply {
+  double result = 1;
+}

@@ -22,3 +22,7 @@ go.work
 
 # Binaries
 cmd/calc_cli/calc_cli
+cmd/calc_client/calc_client
+cmd/calc_server/calc_server
+
+
