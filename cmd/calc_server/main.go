@@ -1,17 +1,16 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
-	"flag"
 	"net"
-	"context"
 
+	pb "github.com/mhbvr/grpc-example/pkg/calc_protos"
 	"github.com/mhbvr/grpc-example/pkg/eval"
 	"google.golang.org/grpc"
-	pb "github.com/mhbvr/grpc-example/pkg/calc_protos"
 )
-
 
 var (
 	port = flag.Int("port", 5050, "The server gRPC port")
@@ -51,7 +50,7 @@ func main() {
 	s := grpc.NewServer()
 	pb.RegisterCalcServer(s, &server{})
 	log.Printf("server listening at %v", lis.Addr())
-	
+
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)
 	}

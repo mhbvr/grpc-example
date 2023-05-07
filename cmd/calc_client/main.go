@@ -1,17 +1,17 @@
 package main
 
 import (
+	"context"
+	"flag"
 	"fmt"
 	"log"
-	"time"
 	"strconv"
 	"strings"
-	"flag"
-	"context"
+	"time"
 
+	pb "github.com/mhbvr/grpc-example/pkg/calc_protos"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	pb "github.com/mhbvr/grpc-example/pkg/calc_protos"
 )
 
 var (
@@ -21,7 +21,7 @@ var (
 func parseValue(s string) (string, float64, error) {
 	fields := strings.Split(s, "=")
 	if len(fields) != 2 {
-		return "", 0.0, fmt.Errorf("can not parse variable, %v")
+		return "", 0.0, fmt.Errorf("can not parse variable, %v", s)
 	}
 	value, err := strconv.ParseFloat(fields[1], 64)
 	if err != nil {
@@ -43,14 +43,14 @@ func main() {
 
 	request := &pb.ComputeRequest{Expression: flag.Args()[0]}
 
-	vars := make([]*pb.Variable,0)
+	vars := make([]*pb.Variable, 0)
 
 	for _, s := range flag.Args()[1:] {
 		variable, value, err := parseValue(s)
 		if err != nil {
 			log.Fatalf("incorrect variable, %v", err)
 		}
-		vars = append(vars, &pb.Variable{Name:variable, Value: value})
+		vars = append(vars, &pb.Variable{Name: variable, Value: value})
 	}
 
 	request.Vars = vars

@@ -13,7 +13,7 @@ import (
 func parseValue(s string) (string, float64, error) {
 	fields := strings.Split(s, "=")
 	if len(fields) != 2 {
-		return "", 0.0, fmt.Errorf("can not parse variable, %v")
+		return "", 0.0, fmt.Errorf("can not parse variable, %v", s)
 	}
 	value, err := strconv.ParseFloat(fields[1], 64)
 	if err != nil {
