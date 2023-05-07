@@ -11,6 +11,7 @@ import (
 	"github.com/mhbvr/grpc-example/pkg/eval"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/channelz/service"
 )
 
 var (
@@ -52,7 +53,9 @@ func main() {
 	pb.RegisterCalcServer(s, &server{})
 	// Register reflection service on gRPC server.
 	reflection.Register(s)
-	
+	// Register channelz service
+	service.RegisterChannelzServiceToServer(s)
+
 	log.Printf("server listening at %v", lis.Addr())
 
 	if err := s.Serve(lis); err != nil {
