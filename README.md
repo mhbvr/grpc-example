@@ -8,9 +8,12 @@ Toy server and client apps to play with gRPC.
 - `calc_client` - gRPC client for the server
 - `calc_load` - gRPC client sends calculation requests with constant rate
 
+## Features
+
+- [gRPC reflection](https://github.com/grpc/grpc-go/blob/master/Documentation/server-reflection-tutorial.md) for [grpcurl](https://github.com/fullstorydev/grpcurl)
+
 ## TODO
 
-- gRPC reflection for [grpcurl](https://github.com/fullstorydev/grpcurl)
 - gRPC [channelz](https://github.com/grpc/proposal/blob/master/A14-channelz.md) introspection. Several [GUI](https://github.com/grpc/grpc-experiments/tree/master/gdebug) [options](https://github.com/rantav/go-grpc-channelz) avaiable
 - Prometheus metrics
 - tracez page

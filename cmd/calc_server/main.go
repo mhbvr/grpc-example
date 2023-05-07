@@ -10,6 +10,7 @@ import (
 	pb "github.com/mhbvr/grpc-example/pkg/calc_protos"
 	"github.com/mhbvr/grpc-example/pkg/eval"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
 )
 
 var (
@@ -49,6 +50,9 @@ func main() {
 
 	s := grpc.NewServer()
 	pb.RegisterCalcServer(s, &server{})
+	// Register reflection service on gRPC server.
+	reflection.Register(s)
+	
 	log.Printf("server listening at %v", lis.Addr())
 
 	if err := s.Serve(lis); err != nil {
