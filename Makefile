@@ -7,6 +7,7 @@ build: clean proto
 	go build -o bin/calc_cli cmd/calc_cli/main.go
 	go build -o bin/calc_server cmd/calc_server/main.go
 	go build -o bin/calc_client cmd/calc_client/main.go	
+	go build -o bin/calc_load cmd/calc_load/main.go	
 
 clean:
 	rm -rf bin
