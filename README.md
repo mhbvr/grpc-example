@@ -11,10 +11,10 @@ Toy server and client apps to play with gRPC.
 ## Features
 
 - [gRPC reflection](https://github.com/grpc/grpc-go/blob/master/Documentation/server-reflection-tutorial.md) for [grpcurl](https://github.com/fullstorydev/grpcurl)
+- gRPC [channelz](https://github.com/grpc/proposal/blob/master/A14-channelz.md) introspection. [GUI](https://github.com/rantav/go-grpc-channelz) available on http://localhost:8080/channelz/
 
 ## TODO
-
-- gRPC [channelz](https://github.com/grpc/proposal/blob/master/A14-channelz.md) introspection. Several [GUI](https://github.com/grpc/grpc-experiments/tree/master/gdebug) [options](https://github.com/rantav/go-grpc-channelz) avaiable
+- Channelz on client
 - Prometheus metrics
 - tracez page
 - profiling and tracing gRPC calls
