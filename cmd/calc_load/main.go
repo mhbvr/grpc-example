@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"strconv"
 	"strings"
@@ -16,11 +17,12 @@ import (
 )
 
 var (
-	addr     = flag.String("addr", "localhost:5050", "the address of Calc server")
-	duration = flag.Duration("duration", 10*time.Second, "duration of load test")
-	timeout  = flag.Duration("timeout", time.Second, "timeout for one request")
-	rate     = flag.Float64("rate", 1, "requests per second")
-	dry_run  = flag.Bool("dry_run", false, "do not send actual requests, just start goroutine to get max possible request rate")
+	addr      = flag.String("addr", "localhost:5050", "the address of Calc server")
+	duration  = flag.Duration("duration", 10*time.Second, "duration of load test")
+	timeout   = flag.Duration("timeout", time.Second, "timeout for one request")
+	rate      = flag.Float64("rate", 1, "requests per second")
+	dry_run   = flag.Bool("dry_run", false, "do not send actual requests, just start goroutine to get max possible request rate")
+	streaming = flag.Bool("streaming", false, "use one bidirectional gRPC stream")
 )
 
 func parseValue(s string) (string, float64, error) {
@@ -39,7 +41,8 @@ func parseValue(s string) (string, float64, error) {
 	return fields[0], value, nil
 }
 
-func runLoad(c pb.CalcClient, request *pb.ComputeRequest, okChan, errChan chan struct{}) {
+func runLoad(c pb.CalcClient, expression string, vars []*pb.Variable, okChan, errChan chan struct{}) {
+	request := &pb.ComputeRequest{Expression: expression, Vars: vars}
 	var wg sync.WaitGroup
 
 	var count int
@@ -78,6 +81,87 @@ func runLoad(c pb.CalcClient, request *pb.ComputeRequest, okChan, errChan chan s
 	wg.Wait()
 }
 
+func runStreamingLoad(c pb.CalcClient, expression string, vars []*pb.Variable, okChan, errChan chan struct{}) {
+	ctx, cancel := context.WithTimeout(context.Background(), *timeout)
+	defer cancel()
+
+	stream, err := c.StreamCompute(ctx)
+	if err != nil {
+		log.Fatalf("can not establich streaming connect, %v", err)
+	}
+
+	// Initial message
+	err = stream.Send(&pb.ComputeRequest{Expression: expression})
+	// TODO: handle io.EOF
+	if err != nil {
+		log.Fatalf("can not send first streaming message, %v", err)
+	}
+
+	var wg sync.WaitGroup
+
+	// Sender
+	wg.Add(1)
+	go func() {
+		var err error
+		var count int
+		for start := time.Now(); time.Since(start) < *duration; {
+
+			if float64(count)/time.Since(start).Seconds() > *rate {
+				continue
+			}
+
+			count++
+
+			if !*dry_run {
+				err = stream.Send(&pb.ComputeRequest{Vars: vars})
+			}
+
+			if err == io.EOF {
+				log.Println("stream aborted")
+				wg.Done()
+				return
+			}
+
+			if err != nil {
+				log.Fatalf("can not send streaming message, %v", err)
+			}
+
+		}
+
+		err = stream.CloseSend()
+		if err != nil {
+			log.Fatalf("can not close stream, %v", err)
+		}
+		wg.Done()
+	}()
+
+	// Receiver
+	if !*dry_run {
+		wg.Add(1)
+		go func() {
+			var err error
+			for {
+				_, err = stream.Recv()
+
+				if err == io.EOF {
+					break
+				}
+
+				if err != nil {
+					log.Printf("gRPC stream error, %v", err)
+					break
+				}
+
+				okChan <- struct{}{}
+			}
+			wg.Done()
+		}()
+	}
+
+	// Wait for complition for sender and receiver
+	wg.Wait()
+}
+
 func main() {
 	flag.Parse()
 
@@ -85,10 +169,7 @@ func main() {
 		log.Fatalf("Need to provide an expression for evaluation")
 	}
 
-	// Create request
-	request := &pb.ComputeRequest{Expression: flag.Args()[0]}
 	vars := make([]*pb.Variable, 0)
-
 	for _, s := range flag.Args()[1:] {
 		variable, value, err := parseValue(s)
 		if err != nil {
@@ -96,8 +177,6 @@ func main() {
 		}
 		vars = append(vars, &pb.Variable{Name: variable, Value: value})
 	}
-
-	request.Vars = vars
 
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -126,7 +205,12 @@ func main() {
 		}
 	}()
 
-	runLoad(c, request, okChan, errChan)
+	if *streaming {
+		runStreamingLoad(c, flag.Args()[0], vars, okChan, errChan)
+	} else {
+		runLoad(c, flag.Args()[0], vars, okChan, errChan)
+	}
+
 	done <- struct{}{}
 
 	fmt.Printf("Ok: %v Errors: %v, Rate: %v req/sec\n", success, errors, float64(success+errors)/duration.Seconds())

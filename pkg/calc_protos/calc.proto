@@ -8,6 +8,12 @@ package calc_protos;
 service Calc {
   // Calculate the expression value
   rpc Compute (ComputeRequest) returns (ComputeReply) {}
+  rpc StreamCompute (stream ComputeRequest) returns (stream ComputeReply) {}
+}
+
+// The integrator
+service Intergator {
+  rpc ComputeIntegral(IntegralRequest) returns (ComputeReply) {}
 }
 
 // Variable value for computation
@@ -22,7 +28,14 @@ message ComputeRequest {
   repeated Variable vars = 2;
 }
 
-// The response message containing the greetings
+// The response message containing the computation result
 message ComputeReply {
   double result = 1;
+}
+
+message IntegralRequest {
+  string function = 1;
+  double from = 2;
+  double to = 3;
+  double delta = 4;
 }

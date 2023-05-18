@@ -4,6 +4,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -12,12 +13,17 @@ import (
 	"github.com/mhbvr/grpc-example/pkg/eval"
 	"google.golang.org/grpc"
 	channelzservice "google.golang.org/grpc/channelz/service"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/status"
+	//"google.golang.org/protobuf/types/known/"
 
 	channelz "github.com/rantav/go-grpc-channelz"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"go.opentelemetry.io/contrib/zpages"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
+
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -33,20 +39,63 @@ type server struct {
 
 // Implementation of Compute RC
 func (s *server) Compute(ctx context.Context, in *pb.ComputeRequest) (*pb.ComputeReply, error) {
+	span := trace.SpanFromContext(ctx)
 	log.Printf("ComputeRequest: %v", in)
 
+	span.AddEvent("start parsing")
 	expr, err := eval.Parse(in.Expression)
 	if err != nil {
 		log.Printf("incorrect expression, %v", err)
 		return nil, err
 	}
 
+	span.AddEvent("start evaliation")
 	var env eval.Env = make(map[eval.Var]float64)
 	for _, v := range in.Vars {
 		env[eval.Var(v.Name)] = v.Value
 	}
 
 	return &pb.ComputeReply{Result: expr.Eval(env)}, nil
+}
+
+func (s *server) StreamCompute(stream pb.Calc_StreamComputeServer) error {
+	span := trace.SpanFromContext(stream.Context())
+	var expr eval.Expr
+	for {
+		in, err := stream.Recv()
+
+		if err == io.EOF {
+			return nil
+		}
+
+		if err != nil {
+			log.Printf("gRPC stream recv error, %v", err)
+			return err
+		}
+
+		// First message should have non empty expression to compute
+		// It is possible to set another expression in the next messages
+		if in.Expression == "" && expr == nil {
+			return status.Error(codes.InvalidArgument, "initial messase without expression")
+		}
+
+		if in.Expression != "" {
+			span.AddEvent("start parsing expression")
+			var err error
+			expr, err = eval.Parse(in.Expression)
+
+			if err != nil {
+				return status.Errorf(codes.InvalidArgument, "can not parse expression %v", err)
+			}
+		}
+
+		var env eval.Env = make(map[eval.Var]float64)
+		for _, v := range in.Vars {
+			env[eval.Var(v.Name)] = v.Value
+		}
+
+		stream.Send(&pb.ComputeReply{Result: expr.Eval(env)})
+	}
 }
 
 func main() {
@@ -66,7 +115,7 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	s := grpc.NewServer(grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()))
+	s := grpc.NewServer(grpc.UnaryInterceptor(otelgrpc.UnaryServerInterceptor()), grpc.StreamInterceptor(otelgrpc.StreamServerInterceptor()))
 
 	// Service for expression evaluation
 	pb.RegisterCalcServer(s, &server{})
